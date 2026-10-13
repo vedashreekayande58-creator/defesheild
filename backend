@@ -1,0 +1,111 @@
+{
+  "name": "tathastu-backend",
+  "version": "1.0.0",
+  "description": "Backend API and Frontend for Tathastu PG and Mess finder platform",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": ["express", "sqlite3", "pg", "mess", "tathastu"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "sqlite3": "^5.1.7"
+  }
+}
+const express = require('express');
+const sqlite3 = require('sqlite3').verbose();
+const cors = require('cors');
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+// Initialize SQLite Database in memory
+const db = new sqlite3.Database(':memory:', (err) => {
+  if (err) console.error('Database opening error: ', err);
+  else console.log('Connected to SQLite database.');
+});
+
+// Create Tables & Seed Data
+db.serialize(() => {
+  db.run(`CREATE TABLE pgs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT, area TEXT, college TEXT, rent INTEGER, gender TEXT,
+    transit_label TEXT, transit_m INTEGER, medical_m INTEGER,
+    daily_label TEXT, daily_m INTEGER, rating REAL, reviews INTEGER, hue INTEGER
+  )`);
+
+  db.run(`CREATE TABLE mess (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT, area TEXT, diet TEXT, transit TEXT, special TEXT,
+    monthly_price INTEGER, single_meal INTEGER, breakfast TEXT, lunch TEXT, dinner TEXT
+  )`);
+
+  db.run(`CREATE TABLE reviews (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    student TEXT, pg_or_mess TEXT, rating INTEGER, comment TEXT
+  )`);
+
+  // Seed PGs
+  const stmtPG = db.prepare(`INSERT INTO pgs (name, area, college, rent, gender, transit_label, transit_m, medical_m, daily_label, daily_m, rating, reviews, hue) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+  [
+    ["Abhinav Boys PG", "Deccan", "Garware College", 6200, "Boys", "Garware College Metro", 150, 30, "Kirana & Daily Needs", 50, 4.8, 92, 260],
+    ["Garware Student Residency for Girls", "Karve Road", "Garware College", 7000, "Girls", "Metro", 100, 20, "Supermarket & ATM", 40, 4.9, 110, 300],
+    ["Shriniwas Luxury Boys PG", "Katraj", "Bharati Vidyapeeth", 5500, "Boys", "Bus Stop", 100, 50, "Daily Needs", 50, 4.8, 86, 200],
+    ["Subhadra Premium Girls Hostel", "Karve Nagar", "Cummins College", 6800, "Girls", "Auto Stand", 50, 30, "Pharmacy & Kirana", 30, 4.9, 142, 320],
+    ["Urban Nest Co-Living Space", "Balewadi", "NICMAR", 8500, "Co-Ed", "Bus Stop", 200, 100, "Mart", 100, 4.7, 58, 190]
+  ].forEach(row => stmtPG.run(row));
+  stmtPG.finalize();
+
+  // Seed Mess
+  const stmtMess = db.prepare(`INSERT INTO mess (name, area, diet, transit, special, monthly_price, single_meal, breakfast, lunch, dinner) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+  [
+    ["Deccan Food Club & Canteen", "Near Garware College", "veg", "100m from Garware College Metro Station & Bus Stop", "Pithla Bhakri, Chapati-Bhaji, Solkadhi", 2400, 80, "Poha, Tea", "Pithla Bhakri, Chapati-Bhaji, Solkadhi", "Varan Bhaat, Jeera Rice, Papad"],
+    ["Annapurna Kolhapuri Canteen", "Karve Nagar", "both", "Auto Stand right outside & 2 min from Cummins College Bus Stop", "Kolhapuri Thali, Tambda Rassa", 2800, 110, "Misal Pav, Tea", "Kolhapuri Thali, Tambda Rassa", "Chicken Sukka / Paneer Bhurji, Bhakri"]
+  ].forEach(row => stmtMess.run(row));
+  stmtMess.finalize();
+
+  // Seed Reviews
+  const stmtRev = db.prepare(`INSERT INTO reviews (student, pg_or_mess, rating, comment) VALUES (?, ?, ?, ?)`);
+  [
+    ["Sneha, Cummins", "Subhadra Premium Girls Hostel", 5, "Safe, clean and the pharmacy is next door. Warden is helpful."],
+    ["Rohan, Garware", "Abhinav Boys PG", 5, "Two-minute walk to college. Wi‑Fi is steady for late-night study."]
+  ].forEach(row => stmtRev.run(row));
+  stmtRev.finalize();
+});
+
+// API Endpoints
+app.get('/api/pgs', (req, res) => {
+  db.all("SELECT * FROM pgs", [], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
+app.get('/api/mess', (req, res) => {
+  db.all("SELECT * FROM mess", [], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
+app.get('/api/reviews', (req, res) => {
+  db.all("SELECT * FROM reviews", [], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
+app.post('/api/visits', (req, res) => {
+  const { pgName, day, time } = req.body;
+  console.log(`Visit booked for ${pgName} on ${day} at ${time}`);
+  res.json({ success: true, message: "Visit booked successfully!" });
+});
+
+const PORT = 3000;
+app.listen(PORT, () => {
+  console.log(`Tathastu backend running on http://localhost:${PORT}`);
+});
